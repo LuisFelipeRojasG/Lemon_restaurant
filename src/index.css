@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+    --font-karla: Karla, sans-serif;
+    --font-markazy: Markazi Text, serif;
+
+    --color-greenlim: #495E57;
+    --color-yellowlim: #F4CE14;
+    --color-whitelim: #EDEFEE;
+    --color-blacklim: #333333;
+    --color-graylim: #f2efef;
+}
