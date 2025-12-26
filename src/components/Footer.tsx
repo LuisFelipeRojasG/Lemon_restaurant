@@ -1,9 +1,9 @@
 import type { JSX } from "react"
 
-export const Menu = (): JSX.Element => {
+export const Footer = (): JSX.Element => {
   return (
     <div>
-      <h2>Our Menu</h2>
+      <h2>Our Footer</h2>
     </div>
   )
 }

@@ -1,13 +1,23 @@
-
+import { BrowserRouter, Routes, Route } from 'react-router'
+import { Home } from './pages/Home'
+import { About } from './pages/About'
+import { Menu } from './pages/Menu'
+import { Booking } from './pages/Booking'
+import { Dashboard } from './components/Dashboard'
 
 function App() {
 
   return (
-    <>
-      <h1 className="text-3xl font-bold underline text-amber-200">
-        Hello world!
-      </h1>
-    </>
+    <BrowserRouter>
+      <Routes>
+        <Route path='dashboard' element={<Dashboard />}>
+          <Route index element={<Home />} />
+          <Route path='About' element={<About />} />
+          <Route path='Menu' element={<Menu />} />
+          <Route path='Booking' element={<Booking />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   )
 }
 
