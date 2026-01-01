@@ -5,8 +5,8 @@ interface NavLink {
 }
 
 export const navLinks: NavLink[] = [
-  { name: 'Home', link: '/dashboard' },
-  { name: 'About', link: '/dashboard/about' },
-  { name: 'Menu', link: '/dashboard/menu' },
-  { name: 'Booking', link: '/dashboard/booking' },
+  { name: 'Home', link: '/' },
+  { name: 'About', link: '/about' },
+  { name: 'Menu', link: '/menu' },
+  { name: 'Booking', link: '/booking' },
 ]

@@ -5,7 +5,7 @@ import { Footer } from "./Footer"
 
 export const Dashboard = (): JSX.Element => {
   return (
-    <div>
+    <div className="w-full pt-20">
         <Header />
         <Outlet />
         <Footer />
