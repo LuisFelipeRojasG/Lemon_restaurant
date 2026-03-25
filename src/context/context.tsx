@@ -1,13 +1,20 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useState, type ReactNode, type JSX } from 'react'
 
-const LemonContext = createContext({})
-
-const useLemon = () => {
-  const context = useContext(LemonContext)
-  return context
+interface LemonContextType {
+  isLemonMode: boolean
+  toggleLemonMode: () => void
 }
 
-const LemonProvider = ({ children }) => {
+const LemonContext = createContext<LemonContextType>({
+  isLemonMode: false,
+  toggleLemonMode: () => {},
+})
+
+interface LemonProviderProps {
+  children: ReactNode
+}
+
+const LemonProvider = ({ children }: LemonProviderProps): JSX.Element => {
   const [isLemonMode, setIsLemonMode] = useState(false)
 
   const toggleLemonMode = () => {
@@ -21,4 +28,4 @@ const LemonProvider = ({ children }) => {
   )
 }
 
-export { LemonProvider, useLemon }
+export { LemonProvider, LemonContext }

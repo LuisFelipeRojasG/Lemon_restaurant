@@ -1,15 +1,21 @@
 import type { JSX } from "react";
+import { useNavigate } from "react-router";
 import { specialCards } from "../utils/specialCard";
 import { SpecialCard } from "../components/SpecialCard";
 
 export const Highlights = (): JSX.Element => {
+  const navigate = useNavigate()
+
   return (
     <section className="flex flex-col justify-center items-center pt-20 md:mt-40">
       <div className="flex justify-around items-center w-11/12 mb-16">
         <h2 className="text-blacklim font-Markazy font-medium text-5xl">
           Specials
         </h2>
-        <button className="bg-yellowlim text-greenlim font-karla font-medium text-xl w-48 h-12 rounded-lg">
+        <button 
+          onClick={() => navigate('/menu')}
+          className="bg-yellowlim text-greenlim font-karla font-medium text-xl w-48 h-12 rounded-lg hover:opacity-90 transition-opacity"
+        >
           Online Menu
         </button>
       </div>

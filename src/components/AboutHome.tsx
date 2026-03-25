@@ -1,8 +1,11 @@
 import type { JSX } from "react"
+import { useNavigate } from "react-router"
 import chefs from '../assets/images/chefs.webp'
 import restaurant from '../assets/images/restaurant.webp'
 
 export const AboutHome = (): JSX.Element => {
+  const navigate = useNavigate()
+
   return (
     <section className="w-screen flex flex-col items-center xl:flex-row xl:justify-around 2xl:px-60 pb-10 bg-greenlim">
       <div className="w-auto px-10 py-20 gap-6 flex flex-col">
@@ -19,7 +22,10 @@ export const AboutHome = (): JSX.Element => {
           features traditional dishes with a modern twist. Little Lemon has
           quickly become a favorite among Chicago locals and visitors alike.
         </p>
-        <button className="bg-yellowlim text-greenlim font-karla font-medium text-xl w-48 h-12 rounded-lg lg:mx-20">
+        <button 
+          onClick={() => navigate('/about')}
+          className="bg-yellowlim text-greenlim font-karla font-medium text-xl w-48 h-12 rounded-lg lg:mx-20 hover:opacity-90 transition-opacity"
+        >
           More about us
         </button>
       </div>
