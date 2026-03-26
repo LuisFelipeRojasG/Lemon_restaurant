@@ -1,5 +1,12 @@
-import { useState, type FormEvent } from "react"
+import { useState, useEffect, type FormEvent } from "react"
 import type { JSX } from "react"
+import { getAvailableTables, createReservation } from "../api/reservations"
+
+interface AvailableTable {
+  id: number
+  number: number
+  capacity: number
+}
 
 interface BookingForm {
   name: string
@@ -10,24 +17,8 @@ interface BookingForm {
   guests: number
   occasion: string
   comments: string
+  table: number | ""
 }
-
-const timeSlots = [
-  "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM",
-  "1:00 PM", "1:30 PM", "2:00 PM", "5:00 PM",
-  "5:30 PM", "6:00 PM", "6:30 PM", "7:00 PM",
-  "7:30 PM", "8:00 PM", "8:30 PM", "9:00 PM",
-]
-
-const occasions = [
-  "Birthday",
-  "Anniversary",
-  "Date Night",
-  "Business Meal",
-  "Family Gathering",
-  "Celebration",
-  "Other",
-]
 
 export const Booking = (): JSX.Element => {
   const [formData, setFormData] = useState<BookingForm>({
@@ -39,62 +30,115 @@ export const Booking = (): JSX.Element => {
     guests: 2,
     occasion: "",
     comments: "",
+    table: "",
   })
   const [submitted, setSubmitted] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof BookingForm, string>>>({})
+  const [availableTables, setAvailableTables] = useState<AvailableTable[]>([])
+  const [loadingTables, setLoadingTables] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [apiError, setApiError] = useState("")
+
+  useEffect(() => {
+    if (formData.date && formData.time && formData.guests) {
+      fetchAvailableTables()
+    }
+  }, [formData.date, formData.time, formData.guests])
+
+  const fetchAvailableTables = async () => {
+    if (!formData.date || !formData.time || !formData.guests) return
+    
+    setLoadingTables(true)
+    try {
+      const timeMap: Record<string, string> = {
+        "11:00 AM": "11", "11:30 AM": "11", "12:00 PM": "12", "12:30 PM": "12",
+        "1:00 PM": "13", "1:30 PM": "13", "2:00 PM": "14",
+        "5:00 PM": "17", "5:30 PM": "17", "6:00 PM": "18", "6:30 PM": "18",
+        "7:00 PM": "19", "7:30 PM": "19", "8:00 PM": "20", "8:30 PM": "20",
+        "9:00 PM": "21",
+      }
+      const apiTime = timeMap[formData.time] || formData.time.replace(":", "").slice(0, 2)
+      const tables = await getAvailableTables(formData.date, apiTime, formData.guests)
+      setAvailableTables(tables)
+    } catch {
+      setAvailableTables([])
+    } finally {
+      setLoadingTables(false)
+    }
+  }
 
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof BookingForm, string>> = {}
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Name is required"
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Invalid email format"
-    }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required"
-    }
-
-    if (!formData.date) {
-      newErrors.date = "Date is required"
-    }
-
-    if (!formData.time) {
-      newErrors.time = "Time is required"
-    }
-
-    if (formData.guests < 1 || formData.guests > 20) {
-      newErrors.guests = "Guests must be between 1 and 20"
-    }
+    if (!formData.name.trim()) newErrors.name = "Name is required"
+    if (!formData.email.trim()) newErrors.email = "Email is required"
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = "Invalid email format"
+    if (!formData.phone.trim()) newErrors.phone = "Phone number is required"
+    if (!formData.date) newErrors.date = "Date is required"
+    if (!formData.time) newErrors.time = "Time is required"
+    if (formData.guests < 1 || formData.guests > 20) newErrors.guests = "Guests must be between 1 and 20"
+    if (!formData.table) newErrors.table = "Please select a table"
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (validateForm()) {
-      console.log("Booking submitted:", formData)
+    setApiError("")
+    
+    if (!validateForm()) return
+
+    setSubmitting(true)
+    try {
+      const timeMap: Record<string, string> = {
+        "11:00 AM": "11:00", "11:30 AM": "11:30", "12:00 PM": "12:00", "12:30 PM": "12:30",
+        "1:00 PM": "13:00", "1:30 PM": "13:30", "2:00 PM": "14:00",
+        "5:00 PM": "17:00", "5:30 PM": "17:30", "6:00 PM": "18:00", "6:30 PM": "18:30",
+        "7:00 PM": "19:00", "7:30 PM": "19:30", "8:00 PM": "20:00", "8:30 PM": "20:30",
+        "9:00 PM": "21:00",
+      }
+      const apiTime = timeMap[formData.time] || formData.time
+      const dateTime = `${formData.date}T${apiTime}:00`
+
+      await createReservation({
+        table: formData.table as number,
+        customer_name: formData.name,
+        customer_email: formData.email,
+        customer_phone: formData.phone,
+        date: dateTime,
+        party_size: formData.guests,
+        notes: `${formData.occasion ? `Occasion: ${formData.occasion}. ` : ''}${formData.comments}`,
+      })
+      
       setSubmitted(true)
+    } catch (err) {
+      console.error(err)
+      setApiError("Failed to create reservation. Please try again.")
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleChange = (field: keyof BookingForm, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }))
-    }
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }))
   }
 
   const getTodayDate = (): string => {
-    const today = new Date()
-    return today.toISOString().split("T")[0]
+    return new Date().toISOString().split("T")[0]
   }
+
+  const timeSlots = [
+    "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM",
+    "1:00 PM", "1:30 PM", "2:00 PM", "5:00 PM",
+    "5:30 PM", "6:00 PM", "6:30 PM", "7:00 PM",
+    "7:30 PM", "8:00 PM", "8:30 PM", "9:00 PM",
+  ]
+
+  const occasions = [
+    "Birthday", "Anniversary", "Date Night", "Business Meal", "Family Gathering", "Celebration", "Other",
+  ]
 
   if (submitted) {
     return (
@@ -113,16 +157,7 @@ export const Booking = (): JSX.Element => {
           <button
             onClick={() => {
               setSubmitted(false)
-              setFormData({
-                name: "",
-                email: "",
-                phone: "",
-                date: "",
-                time: "",
-                guests: 2,
-                occasion: "",
-                comments: "",
-              })
+              setFormData({ name: "", email: "", phone: "", date: "", time: "", guests: 2, occasion: "", comments: "", table: "" })
             }}
             className="mt-8 bg-yellowlim text-greenlim font-karla font-medium text-xl px-8 py-3 rounded-lg hover:opacity-90 transition-opacity"
           >
@@ -144,33 +179,29 @@ export const Booking = (): JSX.Element => {
 
       <section className="max-w-3xl mx-auto px-6 py-12">
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+          {apiError && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+              {apiError}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
-              <label htmlFor="name" className="text-blacklim font-karla font-medium text-lg">
-                Name *
-              </label>
+              <label htmlFor="name" className="text-blacklim font-karla font-medium text-lg">Name *</label>
               <input
-                id="name"
-                type="text"
-                value={formData.name}
+                id="name" type="text" value={formData.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                className="p-3 border border-greenlim rounded-lg font-karla"
-                placeholder="Your full name"
+                className="p-3 border border-greenlim rounded-lg font-karla" placeholder="Your full name"
               />
               {errors.name && <span className="text-red-500 text-sm">{errors.name}</span>}
             </div>
 
             <div className="flex flex-col gap-2">
-              <label htmlFor="email" className="text-blacklim font-karla font-medium text-lg">
-                Email *
-              </label>
+              <label htmlFor="email" className="text-blacklim font-karla font-medium text-lg">Email *</label>
               <input
-                id="email"
-                type="email"
-                value={formData.email}
+                id="email" type="email" value={formData.email}
                 onChange={(e) => handleChange("email", e.target.value)}
-                className="p-3 border border-greenlim rounded-lg font-karla"
-                placeholder="your@email.com"
+                className="p-3 border border-greenlim rounded-lg font-karla" placeholder="your@email.com"
               />
               {errors.email && <span className="text-red-500 text-sm">{errors.email}</span>}
             </div>
@@ -178,34 +209,24 @@ export const Booking = (): JSX.Element => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
-              <label htmlFor="phone" className="text-blacklim font-karla font-medium text-lg">
-                Phone *
-              </label>
+              <label htmlFor="phone" className="text-blacklim font-karla font-medium text-lg">Phone *</label>
               <input
-                id="phone"
-                type="tel"
-                value={formData.phone}
+                id="phone" type="tel" value={formData.phone}
                 onChange={(e) => handleChange("phone", e.target.value)}
-                className="p-3 border border-greenlim rounded-lg font-karla"
-                placeholder="(555) 123-4567"
+                className="p-3 border border-greenlim rounded-lg font-karla" placeholder="(555) 123-4567"
               />
               {errors.phone && <span className="text-red-500 text-sm">{errors.phone}</span>}
             </div>
 
             <div className="flex flex-col gap-2">
-              <label htmlFor="guests" className="text-blacklim font-karla font-medium text-lg">
-                Number of Guests *
-              </label>
+              <label htmlFor="guests" className="text-blacklim font-karla font-medium text-lg">Number of Guests *</label>
               <select
-                id="guests"
-                value={formData.guests}
+                id="guests" value={formData.guests}
                 onChange={(e) => handleChange("guests", Number(e.target.value))}
                 className="p-3 border border-greenlim rounded-lg font-karla"
               >
                 {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
-                  <option key={num} value={num}>
-                    {num} {num === 1 ? "guest" : "guests"}
-                  </option>
+                  <option key={num} value={num}>{num} {num === 1 ? "guest" : "guests"}</option>
                 ))}
               </select>
               {errors.guests && <span className="text-red-500 text-sm">{errors.guests}</span>}
@@ -214,13 +235,9 @@ export const Booking = (): JSX.Element => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
-              <label htmlFor="date" className="text-blacklim font-karla font-medium text-lg">
-                Date *
-              </label>
+              <label htmlFor="date" className="text-blacklim font-karla font-medium text-lg">Date *</label>
               <input
-                id="date"
-                type="date"
-                value={formData.date}
+                id="date" type="date" value={formData.date}
                 min={getTodayDate()}
                 onChange={(e) => handleChange("date", e.target.value)}
                 className="p-3 border border-greenlim rounded-lg font-karla"
@@ -229,52 +246,66 @@ export const Booking = (): JSX.Element => {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label htmlFor="time" className="text-blacklim font-karla font-medium text-lg">
-                Time *
-              </label>
+              <label htmlFor="time" className="text-blacklim font-karla font-medium text-lg">Time *</label>
               <select
-                id="time"
-                value={formData.time}
+                id="time" value={formData.time}
                 onChange={(e) => handleChange("time", e.target.value)}
                 className="p-3 border border-greenlim rounded-lg font-karla"
               >
                 <option value="">Select a time</option>
                 {timeSlots.map((slot) => (
-                  <option key={slot} value={slot}>
-                    {slot}
-                  </option>
+                  <option key={slot} value={slot}>{slot}</option>
                 ))}
               </select>
               {errors.time && <span className="text-red-500 text-sm">{errors.time}</span>}
             </div>
           </div>
 
+          {formData.date && formData.time && (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="table" className="text-blacklim font-karla font-medium text-lg">
+                Available Tables {loadingTables && "(loading...)"}
+              </label>
+              {loadingTables ? (
+                <div className="p-3 text-gray-500">Checking availability...</div>
+              ) : availableTables.length > 0 ? (
+                <select
+                  id="table" value={formData.table}
+                  onChange={(e) => handleChange("table", e.target.value)}
+                  className="p-3 border border-greenlim rounded-lg font-karla"
+                >
+                  <option value="">Select a table</option>
+                  {availableTables.map((table) => (
+                    <option key={table.id} value={table.id}>
+                      Table {table.number} (seats {table.capacity})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="p-3 text-red-500">No tables available for this time. Please try another time.</div>
+              )}
+              {errors.table && <span className="text-red-500 text-sm">{errors.table}</span>}
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
-            <label htmlFor="occasion" className="text-blacklim font-karla font-medium text-lg">
-              Occasion
-            </label>
+            <label htmlFor="occasion" className="text-blacklim font-karla font-medium text-lg">Occasion</label>
             <select
-              id="occasion"
-              value={formData.occasion}
+              id="occasion" value={formData.occasion}
               onChange={(e) => handleChange("occasion", e.target.value)}
               className="p-3 border border-greenlim rounded-lg font-karla"
             >
               <option value="">Select an occasion (optional)</option>
               {occasions.map((occasion) => (
-                <option key={occasion} value={occasion}>
-                  {occasion}
-                </option>
+                <option key={occasion} value={occasion}>{occasion}</option>
               ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="comments" className="text-blacklim font-karla font-medium text-lg">
-              Special Requests
-            </label>
+            <label htmlFor="comments" className="text-blacklim font-karla font-medium text-lg">Special Requests</label>
             <textarea
-              id="comments"
-              value={formData.comments}
+              id="comments" value={formData.comments}
               onChange={(e) => handleChange("comments", e.target.value)}
               className="p-3 border border-greenlim rounded-lg font-karla h-32 resize-none"
               placeholder="Any dietary restrictions, seating preferences, or special requests..."
@@ -282,10 +313,10 @@ export const Booking = (): JSX.Element => {
           </div>
 
           <button
-            type="submit"
-            className="bg-yellowlim text-greenlim font-karla font-medium text-xl px-8 py-4 rounded-lg hover:opacity-90 transition-opacity mt-4"
+            type="submit" disabled={submitting || loadingTables}
+            className="bg-yellowlim text-greenlim font-karla font-medium text-xl px-8 py-4 rounded-lg hover:opacity-90 transition-opacity mt-4 disabled:opacity-50"
           >
-            Confirm Reservation
+            {submitting ? "Processing..." : "Confirm Reservation"}
           </button>
         </form>
       </section>

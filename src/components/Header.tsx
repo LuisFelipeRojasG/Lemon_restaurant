@@ -1,8 +1,8 @@
 import type { JSX } from "react"
 import { Navbar } from "./Navbar"
+import { CartWidget } from "./CartWidget"
 import Logo from "../assets/images/Logo.webp"
-
-import { IoMdMenu } from "react-icons/io";
+import { IoMdMenu } from "react-icons/io"
 
 export const Header = (): JSX.Element => {
   return (
@@ -12,9 +12,12 @@ export const Header = (): JSX.Element => {
           <img src={Logo} alt="Logo" />
         </div>
         <Navbar />
-        <button className='lg:hidden mr-8 border-2 rounded-xl border-greenlim'>
-          <IoMdMenu size={40}/>
-        </button>
+        <div className="flex items-center gap-4 mr-4">
+          <CartWidget />
+          <button className='lg:hidden mr-4 border-2 rounded-xl border-greenlim'>
+            <IoMdMenu size={40}/>
+          </button>
+        </div>
       </div>
     </div>
   )

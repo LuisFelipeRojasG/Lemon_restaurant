@@ -1,75 +1,55 @@
-import type { JSX } from "react"
-import greekSalad from '../assets/images/greek_salad.webp'
-import bruschetta from '../assets/images/bruschetta.webp'
-import lemondessert from '../assets/images/lemon_dessert.webp'
-
-interface MenuItem {
-  name: string
-  description: string
-  price: string
-  image: string
-}
-
-interface MenuCategory {
-  title: string
-  items: MenuItem[]
-}
-
-const menuData: MenuCategory[] = [
-  {
-    title: "Starters",
-    items: [
-      {
-        name: "Greek Salad",
-        description: "Crispy lettuce, peppers, olives, Chicago style feta cheese, garlic and rosemary croutons",
-        price: "$12.99",
-        image: greekSalad,
-      },
-      {
-        name: "Bruschetta",
-        description: "Grilled bread smeared with garlic, seasoned with salt and olive oil",
-        price: "$8.99",
-        image: bruschetta,
-      },
-    ],
-  },
-  {
-    title: "Main Courses",
-    items: [
-      {
-        name: "Grilled Salmon",
-        description: "Fresh Atlantic salmon with herbs and lemon butter sauce",
-        price: "$24.99",
-        image: greekSalad,
-      },
-      {
-        name: "Chicken Souvlaki",
-        description: "Grilled chicken skewers with tzatziki sauce and pita bread",
-        price: "$18.99",
-        image: greekSalad,
-      },
-    ],
-  },
-  {
-    title: "Desserts",
-    items: [
-      {
-        name: "Lemon Dessert",
-        description: "Traditional family recipe with authentic ingredients",
-        price: "$7.99",
-        image: lemondessert,
-      },
-      {
-        name: "Baklava",
-        description: "Layers of phyllo dough with nuts and honey",
-        price: "$8.99",
-        image: lemondessert,
-      },
-    ],
-  },
-]
+import { useState, useEffect } from 'react'
+import type { JSX } from 'react'
+import { getMenuItems } from '../api/menu'
+import { getCategories } from '../api/categories'
+import type { MenuItem } from '../api/menu'
+import type { Category } from '../api/categories'
 
 export const Menu = (): JSX.Element => {
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [itemsData, categoriesData] = await Promise.all([
+          getMenuItems({ available: true }),
+          getCategories(),
+        ])
+        setMenuItems(itemsData)
+        setCategories(categoriesData)
+      } catch (err) {
+        setError('Failed to load menu. Please try again later.')
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  const getItemsByCategory = (categoryId: number) => {
+    return menuItems.filter((item) => item.category === categoryId)
+  }
+
+  if (loading) {
+    return (
+      <div className="pt-20 pb-10 flex justify-center items-center min-h-[50vh]">
+        <div className="text-greenlim text-xl">Loading menu...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="pt-20 pb-10 flex justify-center items-center min-h-[50vh]">
+        <div className="text-red-500 text-xl">{error}</div>
+      </div>
+    )
+  }
+
   return (
     <div className="pt-20 pb-10">
       <section className="bg-greenlim py-16 text-center">
@@ -80,31 +60,50 @@ export const Menu = (): JSX.Element => {
       </section>
 
       <section className="max-w-6xl mx-auto px-6 py-12">
-        {menuData.map((category) => (
-          <div key={category.title} className="mb-16">
-            <h2 className="text-blacklim font-Markazy font-medium text-4xl mb-8 border-b-2 border-greenlim pb-4">
-              {category.title}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {category.items.map((item) => (
-                <article key={item.name} className="flex gap-6 p-4 rounded-xl hover:shadow-lg transition-shadow">
-                  <img 
-                    src={item.image} 
-                    alt={item.name}
-                    className="w-32 h-32 rounded-lg object-cover"
-                  />
-                  <div className="flex flex-col justify-between flex-1">
-                    <div>
-                      <h3 className="text-blacklim font-Markazy font-medium text-2xl">{item.name}</h3>
-                      <p className="text-graylim font-karla font-light text-lg">{item.description}</p>
+        {categories.map((category) => {
+          const categoryItems = getItemsByCategory(category.id)
+          if (categoryItems.length === 0) return null
+          
+          return (
+            <div key={category.id} className="mb-16">
+              <h2 className="text-blacklim font-Markazy font-medium text-4xl mb-8 border-b-2 border-greenlim pb-4">
+                {category.name}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {categoryItems.map((item) => (
+                  <article 
+                    key={item.id} 
+                    className="flex gap-6 p-4 rounded-xl hover:shadow-lg transition-shadow"
+                  >
+                    <img 
+                      src={item.image || '/placeholder-food.webp'} 
+                      alt={item.name}
+                      className="w-32 h-32 rounded-lg object-cover bg-gray-200"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/128?text=Food'
+                      }}
+                    />
+                    <div className="flex flex-col justify-between flex-1">
+                      <div>
+                        <h3 className="text-blacklim font-Markazy font-medium text-2xl">{item.name}</h3>
+                        <p className="text-graylim font-karla font-light text-lg">{item.description}</p>
+                      </div>
+                      <span className="text-greenlim font-karla font-medium text-xl">
+                        ${item.price}
+                      </span>
                     </div>
-                    <span className="text-greenlim font-karla font-medium text-xl">{item.price}</span>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                ))}
+              </div>
             </div>
+          )
+        })}
+        
+        {menuItems.length === 0 && (
+          <div className="text-center text-gray-500 py-12">
+            No menu items available at the moment.
           </div>
-        ))}
+        )}
       </section>
     </div>
   )
