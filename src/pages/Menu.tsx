@@ -4,6 +4,7 @@ import { getMenuItems } from '../api/menu'
 import { getCategories } from '../api/categories'
 import type { MenuItem } from '../api/menu'
 import type { Category } from '../api/categories'
+import { menuImages } from '../utils/menuImages'
 
 export const Menu = (): JSX.Element => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -76,7 +77,7 @@ export const Menu = (): JSX.Element => {
                     className="flex gap-6 p-4 rounded-xl hover:shadow-lg transition-shadow"
                   >
                     <img 
-                      src={item.image || '/placeholder-food.webp'} 
+                      src={menuImages[item.name] || item.image || '/placeholder-food.webp'} 
                       alt={item.name}
                       className="w-32 h-32 rounded-lg object-cover bg-gray-200"
                       onError={(e) => {
@@ -86,7 +87,7 @@ export const Menu = (): JSX.Element => {
                     <div className="flex flex-col justify-between flex-1">
                       <div>
                         <h3 className="text-blacklim font-Markazy font-medium text-2xl">{item.name}</h3>
-                        <p className="text-graylim font-karla font-light text-lg">{item.description}</p>
+                        <p className="text-greenlim font-karla font-light text-lg">{item.description}</p>
                       </div>
                       <span className="text-greenlim font-karla font-medium text-xl">
                         ${item.price}
