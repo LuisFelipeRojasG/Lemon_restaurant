@@ -17,12 +17,14 @@ export interface Reservation {
 export interface ReservationFilters {
   status?: string
   date_from?: string
+  date_to?: string
 }
 
 export const getReservations = async (filters?: ReservationFilters): Promise<Reservation[]> => {
   const params = new URLSearchParams()
   if (filters?.status) params.append('status', filters.status)
   if (filters?.date_from) params.append('date_from', filters.date_from)
+  if (filters?.date_to) params.append('date_to', filters.date_to)
   
   const response = await api.get<Reservation[]>('/reservation/', { params })
   return response.data

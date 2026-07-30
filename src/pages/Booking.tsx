@@ -1,12 +1,7 @@
 import { useState, useEffect, type FormEvent } from "react"
 import type { JSX } from "react"
-import { getAvailableTables, createReservation } from "../api/reservations"
-
-interface AvailableTable {
-  id: number
-  number: number
-  capacity: number
-}
+import { getReservations, createReservation } from "../api/reservations"
+import { getTables } from "../api/tables"
 
 interface BookingForm {
   name: string
@@ -17,7 +12,14 @@ interface BookingForm {
   guests: number
   occasion: string
   comments: string
-  table: number | ""
+}
+
+const TIME_MAP: Record<string, string> = {
+  "11:00 AM": "11:00", "11:30 AM": "11:30", "12:00 PM": "12:00", "12:30 PM": "12:30",
+  "1:00 PM": "13:00", "1:30 PM": "13:30", "2:00 PM": "14:00",
+  "5:00 PM": "17:00", "5:30 PM": "17:30", "6:00 PM": "18:00", "6:30 PM": "18:30",
+  "7:00 PM": "19:00", "7:30 PM": "19:30", "8:00 PM": "20:00", "8:30 PM": "20:30",
+  "9:00 PM": "21:00",
 }
 
 export const Booking = (): JSX.Element => {
@@ -30,40 +32,32 @@ export const Booking = (): JSX.Element => {
     guests: 2,
     occasion: "",
     comments: "",
-    table: "",
   })
   const [submitted, setSubmitted] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof BookingForm, string>>>({})
-  const [availableTables, setAvailableTables] = useState<AvailableTable[]>([])
-  const [loadingTables, setLoadingTables] = useState(false)
+  const [tablesLeft, setTablesLeft] = useState(10)
+  const [loadingAvailability, setLoadingAvailability] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [apiError, setApiError] = useState("")
 
   useEffect(() => {
-    if (formData.date && formData.time && formData.guests) {
-      fetchAvailableTables()
+    if (formData.date) {
+      fetchDayAvailability()
     }
-  }, [formData.date, formData.time, formData.guests])
+  }, [formData.date])
 
-  const fetchAvailableTables = async () => {
-    if (!formData.date || !formData.time || !formData.guests) return
-    
-    setLoadingTables(true)
+  const fetchDayAvailability = async () => {
+    if (!formData.date) return
+
+    setLoadingAvailability(true)
     try {
-      const timeMap: Record<string, string> = {
-        "11:00 AM": "11", "11:30 AM": "11", "12:00 PM": "12", "12:30 PM": "12",
-        "1:00 PM": "13", "1:30 PM": "13", "2:00 PM": "14",
-        "5:00 PM": "17", "5:30 PM": "17", "6:00 PM": "18", "6:30 PM": "18",
-        "7:00 PM": "19", "7:30 PM": "19", "8:00 PM": "20", "8:30 PM": "20",
-        "9:00 PM": "21",
-      }
-      const apiTime = timeMap[formData.time] || formData.time.replace(":", "").slice(0, 2)
-      const tables = await getAvailableTables(formData.date, apiTime, formData.guests)
-      setAvailableTables(tables)
+      const reservations = await getReservations({ date_from: formData.date, date_to: formData.date })
+      const activeCount = reservations.filter((r) => r.status !== "cancelled").length
+      setTablesLeft(Math.max(0, 10 - activeCount))
     } catch {
-      setAvailableTables([])
+      setTablesLeft(0)
     } finally {
-      setLoadingTables(false)
+      setLoadingAvailability(false)
     }
   }
 
@@ -77,10 +71,18 @@ export const Booking = (): JSX.Element => {
     if (!formData.date) newErrors.date = "Date is required"
     if (!formData.time) newErrors.time = "Time is required"
     if (formData.guests < 1 || formData.guests > 20) newErrors.guests = "Guests must be between 1 and 20"
-    if (!formData.table) newErrors.table = "Please select a table"
+    if (tablesLeft === 0) newErrors.date = "No tables available for this date"
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
+  }
+
+  const findSuitableTable = async (partySize: number): Promise<number> => {
+    const tables = await getTables()
+    const sorted = [...tables].sort((a, b) => a.capacity - b.capacity)
+    const table = sorted.find((t) => t.capacity >= partySize)
+    if (!table) throw new Error("No table can accommodate this party size")
+    return table.id
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -91,18 +93,12 @@ export const Booking = (): JSX.Element => {
 
     setSubmitting(true)
     try {
-      const timeMap: Record<string, string> = {
-        "11:00 AM": "11:00", "11:30 AM": "11:30", "12:00 PM": "12:00", "12:30 PM": "12:30",
-        "1:00 PM": "13:00", "1:30 PM": "13:30", "2:00 PM": "14:00",
-        "5:00 PM": "17:00", "5:30 PM": "17:30", "6:00 PM": "18:00", "6:30 PM": "18:30",
-        "7:00 PM": "19:00", "7:30 PM": "19:30", "8:00 PM": "20:00", "8:30 PM": "20:30",
-        "9:00 PM": "21:00",
-      }
-      const apiTime = timeMap[formData.time] || formData.time
+      const apiTime = TIME_MAP[formData.time] || formData.time
       const dateTime = `${formData.date}T${apiTime}:00`
+      const tableId = await findSuitableTable(formData.guests)
 
       await createReservation({
-        table: formData.table as number,
+        table: tableId,
         customer_name: formData.name,
         customer_email: formData.email,
         customer_phone: formData.phone,
@@ -110,7 +106,7 @@ export const Booking = (): JSX.Element => {
         party_size: formData.guests,
         notes: `${formData.occasion ? `Occasion: ${formData.occasion}. ` : ''}${formData.comments}`,
       })
-      
+
       setSubmitted(true)
     } catch (err) {
       console.error(err)
@@ -157,7 +153,7 @@ export const Booking = (): JSX.Element => {
           <button
             onClick={() => {
               setSubmitted(false)
-              setFormData({ name: "", email: "", phone: "", date: "", time: "", guests: 2, occasion: "", comments: "", table: "" })
+              setFormData({ name: "", email: "", phone: "", date: "", time: "", guests: 2, occasion: "", comments: "" })
             }}
             className="mt-8 bg-yellowlim text-greenlim font-karla font-medium text-xl px-8 py-3 rounded-lg hover:opacity-90 transition-opacity"
           >
@@ -261,30 +257,25 @@ export const Booking = (): JSX.Element => {
             </div>
           </div>
 
-          {formData.date && formData.time && (
+          {formData.date && (
             <div className="flex flex-col gap-2">
-              <label htmlFor="table" className="text-blacklim font-karla font-medium text-lg">
-                Available Tables {loadingTables && "(loading...)"}
+              <label className="text-blacklim font-karla font-medium text-lg">
+                Table Availability
               </label>
-              {loadingTables ? (
+              {loadingAvailability ? (
                 <div className="p-3 text-gray-500">Checking availability...</div>
-              ) : availableTables.length > 0 ? (
-                <select
-                  id="table" value={formData.table}
-                  onChange={(e) => handleChange("table", e.target.value)}
-                  className="p-3 border border-greenlim rounded-lg font-karla"
-                >
-                  <option value="">Select a table</option>
-                  {availableTables.map((table) => (
-                    <option key={table.id} value={table.id}>
-                      Table {table.number} (seats {table.capacity})
-                    </option>
-                  ))}
-                </select>
+              ) : tablesLeft > 0 ? (
+                <div className="p-3 bg-green-50 border border-greenlim rounded-lg text-greenlim font-karla font-medium">
+                  {tablesLeft} of 10 tables available for this date
+                </div>
               ) : (
-                <div className="p-3 text-red-500">No tables available for this time. Please try another time.</div>
+                <div className="p-3 bg-red-50 border border-red-400 rounded-lg text-red-600 font-karla font-medium">
+                  No tables available for this date. Please choose another date.
+                </div>
               )}
-              {errors.table && <span className="text-red-500 text-sm">{errors.table}</span>}
+              {errors.date && errors.date === "No tables available for this date" && (
+                <span className="text-red-500 text-sm">{errors.date}</span>
+              )}
             </div>
           )}
 
@@ -313,7 +304,7 @@ export const Booking = (): JSX.Element => {
           </div>
 
           <button
-            type="submit" disabled={submitting || loadingTables}
+            type="submit" disabled={submitting || loadingAvailability || tablesLeft === 0}
             className="bg-yellowlim text-greenlim font-karla font-medium text-xl px-8 py-4 rounded-lg hover:opacity-90 transition-opacity mt-4 disabled:opacity-50"
           >
             {submitting ? "Processing..." : "Confirm Reservation"}

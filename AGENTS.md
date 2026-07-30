@@ -21,10 +21,9 @@ npm run preview       # Preview production build
 
 ### Testing
 ```bash
-# No test framework configured - this is a TODO
-# To add tests: npm create vitest@latest
-# Then run: npm run test        # Run all tests
-#          npm run test -- --run testFile.test.ts  # Single file
+npm run test              # Run all tests (vitest run)
+npm run test:watch        # Watch mode
+npm run test -- src/api/reservations.test.ts  # Single file
 ```
 
 ## Code Style Guidelines
