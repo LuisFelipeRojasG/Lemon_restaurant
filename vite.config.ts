@@ -8,4 +8,5 @@ export default defineConfig({
   test: {
     globals: true,
   },
+  base: '/vite-react-deploy/',
 })
